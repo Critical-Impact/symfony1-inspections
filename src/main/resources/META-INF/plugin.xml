@@ -1,6 +1,6 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
-    <id>org.jetbrains.plugins.template</id>
+    <id>org.nexvia.symfonyinspections</id>
     <name>Symfony 1 Inspections</name>
     <vendor>Nexvia</vendor>
 
@@ -13,5 +13,6 @@
     <extensions defaultExtensionNs="com.intellij">
         <gotoDeclarationHandler implementation="org.nexvia.symfonyinspections.scope.PhpControllerDeclarationHandler" />
         <psi.referenceContributor language="yaml" implementation="org.nexvia.symfonyinspections.psi.RoutingYmlReferenceContributor" id="RoutingYmlReferenceContributor"/>
+        <treeStructureProvider implementation="org.nexvia.symfonyinspections.providers.ControllerTreeStructureProvider"/>
     </extensions>
 </idea-plugin>
