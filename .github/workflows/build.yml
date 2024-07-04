@@ -139,6 +139,7 @@ jobs:
         with:
           files: ${{ github.workspace }}/build/reports/kover/report.xml
 
+
   # Run plugin structure verification along with IntelliJ Plugin Verifier
   verify:
     name: Verify plugin
