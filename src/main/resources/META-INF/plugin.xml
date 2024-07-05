@@ -15,4 +15,5 @@
         <psi.referenceContributor language="yaml" implementation="org.nexvia.symfonyinspections.psi.RoutingYmlReferenceContributor" id="RoutingYmlReferenceContributor"/>
         <treeStructureProvider implementation="org.nexvia.symfonyinspections.providers.ControllerTreeStructureProvider"/>
     </extensions>
+
 </idea-plugin>

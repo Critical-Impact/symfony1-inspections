@@ -1,25 +1,30 @@
 package org.nexvia.symfonyinspections.filefinder
 
-import com.intellij.psi.PsiElement
-import com.intellij.psi.PsiFile
-import com.intellij.psi.PsiManager
-import com.intellij.psi.PsiRecursiveElementVisitor
+import com.intellij.psi.*
 import com.jetbrains.php.lang.psi.PhpFile
 import com.jetbrains.php.lang.psi.elements.MethodReference
 import com.jetbrains.php.lang.psi.elements.StringLiteralExpression
+import org.jetbrains.yaml.psi.YAMLKeyValue
+import org.jetbrains.yaml.psi.YAMLMapping
+import org.jetbrains.yaml.psi.impl.YAMLKeyValueImpl
 import org.nexvia.symfonyinspections.files.PartialFile
 import org.nexvia.symfonyinspections.files.SuccessFile
+import org.nexvia.symfonyinspections.files.YamlFile
 
+class ControllerFileInfo(val files:List<PsiFile>, val isAjax:Boolean)
+{
+
+}
 
 object ControllerAssociations {
-    fun findTemplateFiles(file: PsiFile): List<PsiFile> {
+    fun findTemplateFiles(file: PsiFile): ControllerFileInfo {
         val templateFiles: MutableList<PsiFile> = ArrayList()
+        var isAjax = false
         if (file is PhpFile) {
-            if(isActionFile(file))
-            {
+            if(isActionFile(file)) {
+                val actionName = getActionName(file)
                 val templateFile = findTemplateForAction(file)
-                if(templateFile != null)
-                {
+                if (templateFile != null) {
                     templateFiles.add(SuccessFile(templateFile.viewProvider, templateFile.language))
                 }
                 file.accept(object : PsiRecursiveElementVisitor() {
@@ -31,14 +36,82 @@ object ControllerAssociations {
                                 val partialFile = getTemplateFileFromMethod(methodRef, file)
                                 if (partialFile != null) {
                                     templateFiles.add(partialFile)
+                                } else {
+                                    isAjax = true
                                 }
                             }
                         }
                     }
                 })
+
+                val ymlForAction = findRoutingYmlForAction(file)
+                if(ymlForAction != null) {
+                    var moduleInfo = getModuleForAction(file)
+                    ymlForAction.accept(object : PsiRecursiveElementVisitor() {
+                        override fun visitElement(element: PsiElement) {
+                            super.visitElement(element)
+
+                            if (element is YAMLKeyValue) {
+                                if ("action" == element.keyText) {
+                                    val parent = element.getParent() as? YAMLMapping ?: return
+
+                                    val moduleKeyValue = parent.getKeyValueByKey("module")
+                                        ?: return
+
+                                    val module = moduleKeyValue.valueText
+                                    val action: String = element.valueText
+                                    val originalElement = element.value?.navigationElement
+                                    if(module == moduleInfo?.module && actionName == action)
+                                    {
+                                        templateFiles.add(YamlFile(ymlForAction.viewProvider, ymlForAction.language, moduleKeyValue))
+                                    }
+                                }
+                            }
+                        }
+                    })
+                }
+
             }
         }
-        return templateFiles
+        return ControllerFileInfo(templateFiles, isAjax)
+    }
+
+    fun getModuleForAction(file: PsiFile): ModuleInfo? {
+        var module = extractModuleName(file.virtualFile.path, file.project.basePath.toString())
+        return module
+    }
+
+    fun extractModuleName(filePath: String, rootPath: String): ModuleInfo? {
+        // Ensure the filePath starts with the rootPath
+        if (!filePath.startsWith(rootPath)) return null
+
+        // Define the apps directory as a constant
+        val appsDirectory = "apps"
+        val modulesDirectory = "modules"
+
+        // Remove the rootPath from the filePath
+        val relativePath = filePath.removePrefix(rootPath)
+
+        // Split the relativePath into segments
+        val pathSegments = relativePath.split("/").filter { it.isNotEmpty() }
+
+        // Check if the apps directory exists in the segments and get its index
+        val appsIndex = pathSegments.indexOf(appsDirectory)
+        if (appsIndex == -1 || appsIndex + 1 >= pathSegments.size) return null
+        var app = pathSegments[appsIndex + 1]
+
+
+        val modulesIndex = pathSegments.indexOf(modulesDirectory)
+        if (modulesIndex == -1 || modulesIndex + 1 >= pathSegments.size) return null
+        var module = pathSegments[modulesIndex + 1]
+
+        // The module name should be the segment after the apps directory and the module's name
+        return ModuleInfo(module, app)
+    }
+
+    fun getActionName(psiFile: PsiFile): String
+    {
+        return psiFile.name.replace("Action.class.php", "")
     }
 
     fun isActionFile(psiFile: PsiFile): Boolean {
@@ -51,6 +124,12 @@ object ControllerAssociations {
             "../templates/$templateName"
         )
         return if (templateFile != null) PsiManager.getInstance(actionFile.project).findFile(templateFile) else null
+    }
+    fun findRoutingYmlForAction(actionFile: PsiFile): PsiFile? {
+        val routingFile = actionFile.virtualFile.parent.findFileByRelativePath(
+            "../../../config/routing.yml"
+        )
+        return if (routingFile != null) PsiManager.getInstance(actionFile.project).findFile(routingFile) else null
     }
 
     private fun isRenderMethod(methodRef: MethodReference): Boolean {
@@ -79,4 +158,8 @@ object ControllerAssociations {
         }
         return null
     }
+}
+
+class ModuleInfo(val module: String, val app: String )
+{
 }
