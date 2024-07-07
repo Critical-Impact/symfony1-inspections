@@ -26,14 +26,6 @@ class YamlFile(viewProvider: FileViewProvider, language: Language, private val n
         return YAMLFileType.YML
     }
 
-    override fun getName(): String {
-        val text = super.getName()
-        if(navigationElement != null) {
-            return text + ":" + navigationElement.startOffset
-        }
-        return text
-    }
-
     override fun getNavigationElement(): PsiElement {
         if(navigationElement != null)
         {

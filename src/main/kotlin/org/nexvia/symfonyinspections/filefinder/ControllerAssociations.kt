@@ -7,6 +7,8 @@ import com.jetbrains.php.lang.psi.elements.StringLiteralExpression
 import org.jetbrains.yaml.psi.YAMLKeyValue
 import org.jetbrains.yaml.psi.YAMLMapping
 import org.jetbrains.yaml.psi.impl.YAMLKeyValueImpl
+import org.nexvia.symfonyinspections.cache.Cache
+import org.nexvia.symfonyinspections.cache.RoutingCacheEntry
 import org.nexvia.symfonyinspections.files.PartialFile
 import org.nexvia.symfonyinspections.files.SuccessFile
 import org.nexvia.symfonyinspections.files.YamlFile
@@ -27,48 +29,35 @@ object ControllerAssociations {
                 if (templateFile != null) {
                     templateFiles.add(SuccessFile(templateFile.viewProvider, templateFile.language))
                 }
-                file.accept(object : PsiRecursiveElementVisitor() {
-                    override fun visitElement(element: PsiElement) {
-                        super.visitElement(element)
-                        if (element is MethodReference) {
-                            val methodRef = element
-                            if (isRenderMethod(methodRef)) {
-                                val partialFile = getTemplateFileFromMethod(methodRef, file)
-                                if (partialFile != null) {
-                                    templateFiles.add(partialFile)
-                                } else {
-                                    isAjax = true
-                                }
-                            }
-                        }
-                    }
-                })
-
-                val ymlForAction = findRoutingYmlForAction(file)
-                if(ymlForAction != null) {
-                    var moduleInfo = getModuleForAction(file)
-                    ymlForAction.accept(object : PsiRecursiveElementVisitor() {
+                if(file.fileDocument.text.contains("getPartial")) {
+                    file.accept(object : PsiRecursiveElementVisitor() {
                         override fun visitElement(element: PsiElement) {
                             super.visitElement(element)
-
-                            if (element is YAMLKeyValue) {
-                                if ("action" == element.keyText) {
-                                    val parent = element.getParent() as? YAMLMapping ?: return
-
-                                    val moduleKeyValue = parent.getKeyValueByKey("module")
-                                        ?: return
-
-                                    val module = moduleKeyValue.valueText
-                                    val action: String = element.valueText
-                                    val originalElement = element.value?.navigationElement
-                                    if(module == moduleInfo?.module && actionName == action)
-                                    {
-                                        templateFiles.add(YamlFile(ymlForAction.viewProvider, ymlForAction.language, moduleKeyValue))
+                            if (element is MethodReference) {
+                                val methodRef = element
+                                if (isRenderMethod(methodRef)) {
+                                    val partialFile = getTemplateFileFromMethod(methodRef, file)
+                                    if (partialFile != null) {
+                                        templateFiles.add(partialFile)
+                                    } else {
+                                        isAjax = true
                                     }
                                 }
                             }
                         }
                     })
+                }
+
+                val ymlForAction = findRoutingYmlForAction(file)
+                if(ymlForAction != null) {
+                    var moduleInfo = getModuleForAction(file)
+                    if(moduleInfo != null) {
+                        var routingCache = Cache.getRoutingCache(ymlForAction)
+                        var results = routingCache.filter { routingCacheEntry: RoutingCacheEntry -> routingCacheEntry.action == actionName && routingCacheEntry.module == moduleInfo.module }
+                        for (route: RoutingCacheEntry in results) {
+                            templateFiles.add(YamlFile(ymlForAction.viewProvider, ymlForAction.language, route.moduleElement))
+                        }
+                    }
                 }
 
             }
