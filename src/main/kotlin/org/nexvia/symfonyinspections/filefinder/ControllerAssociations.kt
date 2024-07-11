@@ -123,7 +123,7 @@ object ControllerAssociations {
 
     private fun isRenderMethod(methodRef: MethodReference): Boolean {
         val methodName = methodRef.name!!
-        return "getPartial" == methodName || "renderAjax" == methodName // Add other method names if necessary
+        return "getPartial" == methodName || "renderAjax" == methodName  || "renderPartial" == methodName // Add other method names if necessary
     }
 
     private fun getTemplateFileFromMethod(methodRef: MethodReference, actionFile: PsiFile): PsiFile? {
